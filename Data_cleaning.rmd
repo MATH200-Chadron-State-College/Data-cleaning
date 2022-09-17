@@ -1,1 +1,56 @@
+---
+title: "Homework 04: Data Cleaning"
+author: "Gregory Moses"
+---
 
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = F)
+options(digits = 3)
+
+library(tidyverse)
+library(readr)
+library(stringr)
+library(dplyr)
+```
+
+
+
+## Part 1 (curve balls)
+Instructions: Determine what makes a successful curveball. Then, determine which pitcher pitches the most successful curve balls.
+
+We note that although the instructions mention velocity, that is not in our data set. The only "meaningfully numerical" data we have is spin rate and adj_h, and I can't find a definition of adj_h, so we will restrict ourselves to spin rate.
+
+```{r}
+pitch <- read_csv("http://srvanderplas.github.io/rwrks/03-r-format/data/pitch.csv")
+colnames(pitch)
+```
+Not knowing anything about baseball, I'll start by looking at the summary information for the various outcomes. It seemed like "action_result" should be more relevant than "ab_result" since we are looking at individual pitches.
+
+```{r}
+pitch %>% group_by(action_result) %>% 
+  summarise(
+  mean_spin = mean(spin_rate),
+  median_spin = median(spin_rate)
+  )
+```
+
+### Part 2 (Census data)
+
+In this part of the assignment, we will...
+
+```{r}
+print("Use tidyr to get the data into a long format")
+census <- read_csv("http://srvanderplas.github.io/rwrks/03-r-format/data/occupation-1870.csv")
+job <- census %>% gather(Occupation,number,"Agriculture.Male":"School.Female")
+
+print("Seperate occupation.gender into two variables")
+
+job$Occupation <- paste(job$Occupation)
+job <- job %>% separate(Occupation, c('Occupation', 'Sex'))
+
+print("Create a scatterplot ")
+
+ggplot(job, aes(x=Occupation, y=number, fill=Sex)) + geom_boxplot()
+
+ggplot(job, aes(x=Sex, y=number, fill=Occupation)) + geom_boxplot()
+```
