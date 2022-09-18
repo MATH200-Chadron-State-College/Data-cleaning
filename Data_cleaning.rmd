@@ -16,41 +16,108 @@ library(dplyr)
 
 
 ## Part 1 (curve balls)
-Instructions: Determine what makes a successful curveball. Then, determine which pitcher pitches the most successful curve balls.
+Instructions: Determine what makes a successful curveball. Then, determine which pitcher pitches the most successful curve balls. Use the "count" command to count the total number of curveballs.
 
-We note that although the instructions mention velocity, that is not in our data set. The only "meaningfully numerical" data we have is spin rate and adj_h, and I can't find a definition of adj_h, so we will restrict ourselves to spin rate.
+Although the instructions in Canvas mention velocity, that is not in our data set. We'll look only at the spin rate.
 
 ```{r}
 pitch <- read_csv("http://srvanderplas.github.io/rwrks/03-r-format/data/pitch.csv")
-colnames(pitch)
 ```
 Not knowing anything about baseball, I'll start by looking at the summary information for the various outcomes. It seemed like "action_result" should be more relevant than "ab_result" since we are looking at individual pitches.
 
 ```{r}
+pitch_with_errors<-pitch[pitch$pitch_type=="CU",]
+pitch<-na.omit(pitch)
+
+
 pitch %>% group_by(action_result) %>% 
   summarise(
   mean_spin = mean(spin_rate),
-  median_spin = median(spin_rate)
+  median_spin = median(spin_rate),
   )
 ```
+Our intuition is that if we're keeping track of rpm, it should be because rpm is correlated to outcome; for example, a batter is less likely to hit a ball thrown with a high rpm. From the table, that doesn't obviously seem to be true, but let's approach the question more formally by asking if the outcomes have different means.
+
+```{r}
+bartlett.test(spin_rate ~ action_result, data = pitch)
+oneway.test(spin_rate ~ action_result, data = pitch, var.equal = TRUE)
+```
+
+Undergraduate statistics was long ago, but if I'm doing this right, we should not reject the null hypothesis, i.e. we should not think that different outcomes have different mean rpms. What about the mysterious "adj_h"? 
+```{r}
+bartlett.test(adj_h ~ action_result, data = pitch)
+oneway.test(spin_rate~action_result, data = pitch, var.equal = FALSE)
+```
+
+This also does not seem to be correlated to outcome. We'll have to find some other way.
+
+
+A little Googling suggests that at least for fastballs, a high or low rpm is supposed to be good, while a middling rpm is bad. We'll define a "good" rpm to be in either the first or fourth quartile.
+```{r}
+summary(pitch$spin_rate)
+good<-filter(pitch,spin_rate>3192 | spin_rate<3042)
+```
+
+
+
+We'll now see what player ids got the most of these "good" pitches; we'll limit ourselves to the top 5.
+
+```{r}
+display<-as.data.frame(table(good$playerid))
+colnames(display)<-c("Player","Good_pitches")
+truncated<-head(display[order(-display$Good_pitches),],5)
+print.data.frame(truncated, row.names = FALSE)
+
+```
+If we're willing to buy our definition of a "good curveball," three players in the data are clearly, radically better than the rest.  There are a total of
+```{r}
+nrow(display)
+```
+pitchers who've thrown at least one good curveball. In total, there were
+```{r}
+sum(display$Good_pitches)
+```
+good curveballs, out of
+```{r}
+nrow(pitch_with_errors)
+```
+curveballs thrown.
 
 ### Part 2 (Census data)
 
 In this part of the assignment, we will...
 
+#### Use tidyr to get the data into a long format
+
 ```{r}
-print("Use tidyr to get the data into a long format")
 census <- read_csv("http://srvanderplas.github.io/rwrks/03-r-format/data/occupation-1870.csv")
 job <- census %>% gather(Occupation,number,"Agriculture.Male":"School.Female")
+```
 
-print("Seperate occupation.gender into two variables")
+#### Seperate occupation.gender into two variables
 
+```{r}
 job$Occupation <- paste(job$Occupation)
 job <- job %>% separate(Occupation, c('Occupation', 'Sex'))
-
-print("Create a scatterplot ")
-
-ggplot(job, aes(x=Occupation, y=number, fill=Sex)) + geom_boxplot()
-
-ggplot(job, aes(x=Sex, y=number, fill=Occupation)) + geom_boxplot()
 ```
+
+```{r}
+
+#### Plot occupation vs. sex (dot plot specified)
+
+ggplot(job, aes(x=Occupation, y=number, color=Sex)) + geom_point()
+
+ggplot(job, aes(x=Sex, y=number, color=Occupation)) + geom_point()
+```
+
+#### Boxplot
+
+I think that box plots are easier to parse in this case, thanks to the data not covering itself
+
+```{r}
+ggplot(job, aes(x=Occupation, y=number, color=Sex)) + geom_boxplot()
+
+ggplot(job, aes(x=Sex, y=number, color=Occupation)) + geom_boxplot()
+```
+
+From the dot or box plots, we see that far more men were employed than woman; that women were basically not employed in agriculture, manufacturing, or trade; and that the only category with something like parity between the sexes was School. Other than School, women were closest to men in Service industries. We also see that for men, the largest industry by a significant margin was Agriculture.
